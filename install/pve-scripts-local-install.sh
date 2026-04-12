@@ -2,8 +2,8 @@
 
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: michelroegl-brunner
-# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
-# Source: https://github.com/community-scripts/ProxmoxVE-Local
+# License: MIT | https://github.com/pedro-pereira-dev/ProxmoxVE/raw/main/LICENSE
+# Source: https://github.com/pedro-pereira-dev/ProxmoxVE-Local
 
 source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
 color
