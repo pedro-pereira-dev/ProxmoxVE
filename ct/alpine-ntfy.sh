@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+source <(curl -fsSL https://raw.githubusercontent.com/pedro-pereira-dev/ProxmoxVE/main/misc/build.func)
 
 # Copyright (c) 2021-2026 community-scripts ORG
 # Author: cobalt (cobaltgit)
-# License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
+# License: MIT | https://github.com/pedro-pereira-dev/ProxmoxVED/raw/main/LICENSE
 # Source: https://ntfy.sh/
 
 APP="Alpine-ntfy"
