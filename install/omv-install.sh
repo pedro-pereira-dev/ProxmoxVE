@@ -19,8 +19,8 @@ echo "deb [signed-by=/etc/apt/trusted.gpg.d/openmediavault-archive-keyring.gpg] 
 export APT_LISTCHANGES_FRONTEND=none
 export DEBIAN_FRONTEND=noninteractive
 export LANG=C.UTF-8
-$STD apt-get update
-$STD apt-get install -y openmediavault openmediavault-keyring \
+$STD apt update
+$STD apt install -y openmediavault openmediavault-keyring \
   --allow-change-held-packages \
   --allow-downgrades \
   --auto-remove \
@@ -34,7 +34,7 @@ msg_ok "Installed OpenMediaVault"
 
 msg_info "Regenerating OpenMediaVault index (patience)"
 timeout 300s bash -c "until ping -c1 -W1 community-scripts.org &>/dev/null; do sleep 1; done"
-$STD apt-get update
+$STD apt update
 msg_ok "Regenerated OpenMediaVault index"
 
 if whiptail \
