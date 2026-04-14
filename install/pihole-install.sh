@@ -13,112 +13,35 @@ setting_up_container
 network_check
 update_os
 
-msg_warn "WARNING: This script will run an external installer from a third-party source (https://pi-hole.net/)."
-msg_warn "The following code is NOT maintained or audited by our repository."
-msg_warn "If you have any doubts or concerns, please review the installer code before proceeding:"
-msg_custom "${TAB3}${GATEWAY}${BGN}${CL}" "\e[1;34m" "→  https://install.pi-hole.net"
-echo
-read -r -p "${TAB3}Do you want to continue? [y/N]: " CONFIRM
-if [[ ! "$CONFIRM" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-  msg_error "Aborted by user. No changes have been made."
-  exit 10
-fi
-
-msg_info "Installing Dependencies"
-$STD apt install -y ufw
-msg_ok "Installed Dependencies"
-
 msg_info "Installing Pi-hole"
 mkdir -p /etc/pihole
 touch /etc/pihole/pihole.toml
 $STD bash <(curl -fsSL https://install.pi-hole.net) --unattended
-sed -i -E '
-/^\s*upstreams =/ s|=.*|= ["8.8.8.8", "8.8.4.4"]|
-/^\s*interface =/ s|=.*|= "eth0"|
-/^\s*queryLogging =/ s|=.*|= true|
-/^\s*size =/ s|=.*|= 10000|
-/^\s*active =/ s|=.*|= true|
-/^\s*listeningMode =/ s|=.*|= "LOCAL"|
-/^\s*port =/ s|=.*|= "80o,443os,[::]:80o,[::]:443os"|
-/^\s*pwhash =/ s|=.*|= ""|
-
-# DHCP Disable
-/^\s*\[dhcp\]/,/^\s*\[/{s/^\s*active = true/  active = false/}
-
-# NTP Disable
-/^\s*\[ntp.ipv4\]/,/^\s*\[/{s/^\s*active = true/  active = false/}
-/^\s*\[ntp.ipv6\]/,/^\s*\[/{s/^\s*active = true/  active = false/}
-/^\s*\[ntp.sync\]/,/^\s*\[/{s/^\s*active = true/  active = false/}
-/^\s*\[ntp.sync\]/,/^\s*\[/{s/^\s*interval = [0-9]+/  interval = 0/}
-/^\s*\[ntp.sync.rtc\]/,/^\s*\[/{s/^\s*set = true/  set = false/}
-
-# set domainNeeded und expandHosts
-/^\s*domainNeeded =/ s|=.*|= true|
-/^\s*expandHosts =/ s|=.*|= true|
-' /etc/pihole/pihole.toml
-
-cat <<EOF >/etc/dnsmasq.d/01-pihole.conf
-server=8.8.8.8
-server=8.8.4.4
-EOF
-$STD pihole-FTL --config ntp.sync.interval 0
+sed -i -E \
+  -e '/^\s*upstreams =/ s|=.*|= ["8.8.8.8", "8.8.4.4"]|' \
+  -e '/^\s*domainNeeded =/ s|=.*|= true|' \
+  -e '/^\s*expandHosts =/ s|=.*|= true|' \
+  -e '/^\s*interface =/ s|=.*|= "eth0"|' \
+  -e '/^\s*\[ntp.ipv4\]/,/^\s*\[/{s/^\s*active = true/  active = false/}' \
+  -e '/^\s*\[ntp.ipv6\]/,/^\s*\[/{s/^\s*active = true/  active = false/}' \
+  -e '/^\s*\[ntp.sync\]/,/^\s*\[/{s/^\s*active = true/  active = false/}' \
+  -e '/^\s*pwhash =/ s|=.*|= ""|' \
+  /etc/pihole/pihole.toml
+echo -e "server=8.8.8.8\nserver=8.8.4.4" >/etc/dnsmasq.d/01-pihole.conf
 systemctl restart pihole-FTL.service
 msg_ok "Installed Pi-hole"
 
-read -r -p "${TAB3}Would you like to add Unbound? <y/N> " prompt
-if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
-  read -r -p "${TAB3}Unbound is configured as a recursive DNS server by default, would you like it to be configured as a forwarding DNS server (using DNS-over-TLS (DoT)) instead? <y/N> " prompt
-  msg_info "Installing Unbound"
-  mkdir -p /etc/unbound/unbound.conf.d
-  cat <<EOF >/etc/unbound/unbound.conf.d/pi-hole.conf
-server:
-  verbosity: 0
-  interface: 127.0.0.1
-  port: 5335
-  do-ip6: no
-  do-ip4: yes
-  do-udp: yes
-  do-tcp: yes
-  num-threads: 1
-  hide-identity: yes
-  hide-version: yes
-  harden-glue: yes
-  harden-dnssec-stripped: yes
-  harden-referral-path: yes
-  use-caps-for-id: no
-  harden-algo-downgrade: no
-  qname-minimisation: yes
-  aggressive-nsec: yes
-  rrset-roundrobin: yes
-  cache-min-ttl: 300
-  cache-max-ttl: 14400
-  msg-cache-slabs: 8
-  rrset-cache-slabs: 8
-  infra-cache-slabs: 8
-  key-cache-slabs: 8
-  serve-expired: yes
-  serve-expired-ttl: 3600
-  edns-buffer-size: 1232
-  prefetch: yes
-  prefetch-key: yes
-  target-fetch-policy: "3 2 1 1 1"
-  unwanted-reply-threshold: 10000000
-  rrset-cache-size: 256m
-  msg-cache-size: 128m
-  so-rcvbuf: 1m
-  private-address: 192.168.0.0/16
-  private-address: 169.254.0.0/16
-  private-address: 172.16.0.0/12
-  private-address: 10.0.0.0/8
-  private-address: fd00::/8
-  private-address: fe80::/10
-EOF
-  mkdir -p /etc/dnsmasq.d/
-  cat <<EOF >/etc/dnsmasq.d/99-edns.conf
-edns-packet-max=1232
-EOF
+if whiptail \
+  --title "Customize Pi-hole" \
+  --yesno "Would you like to add Unbound?\n(https://wiki.omv-extras.org/)" \
+  --defaultno \
+  8 60; then
 
-  if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
+  if whiptail \
+    --title "Customize Pi-hole" \
+    --yesno "Unbound is configured as a recursive DNS server by default,\nwould you like to configure it as a forwarding DNS server instead? (using DNS-over-TLS (DoT))" \
+    --defaultno \
+    8 60; then
     cat <<EOF >>/etc/unbound/unbound.conf.d/pi-hole.conf
   tls-cert-bundle: "/etc/ssl/certs/ca-certificates.crt"
 forward-zone:
@@ -141,18 +64,105 @@ forward-zone:
   #forward-addr: 2620:fe::fe@853#dns.quad9.net
   #forward-addr: 2620:fe::9@853#dns.quad9.net
 EOF
-  fi
-  $STD apt install -y unbound
-  cat <<EOF >/etc/dnsmasq.d/01-pihole.conf
-server=127.0.0.1#5335
-server=8.8.8.8
-server=8.8.4.4
-EOF
 
-  sed -i -E '/^\s*upstreams\s*=\s*\[/,/^\s*\]/c\  upstreams = [\n    "127.0.0.1#5335",\n    "8.8.4.4"\n  ]' /etc/pihole/pihole.toml
-  systemctl restart unbound
+  else
+    cat <<EOF >/etc/unbound/unbound.conf.d/pi-hole.conf
+server:
+  aggressive-nsec: yes
+  cache-max-ttl: 14400
+  cache-min-ttl: 300
+  do-ip4: yes
+  do-ip6: no
+  do-tcp: yes
+  do-udp: yes
+  edns-buffer-size: 1232
+  harden-algo-downgrade: no
+  harden-dnssec-stripped: yes
+  harden-glue: yes
+  harden-referral-path: yes
+  hide-identity: yes
+  hide-version: yes
+  infra-cache-slabs: 8
+  interface: 127.0.0.1
+  key-cache-slabs: 8
+  msg-cache-size: 128m
+  msg-cache-slabs: 8
+  num-threads: 1
+  port: 5335
+  prefer-ip6: no
+  prefetch-key: yes
+  prefetch: yes
+  private-address: 10.0.0.0/8
+  private-address: 169.254.0.0/16
+  private-address: 172.16.0.0/12
+  private-address: 192.0.2.0/24
+  private-address: 192.168.0.0/16
+  private-address: 198.51.100.0/24
+  private-address: 2001:db8::/32
+  private-address: 203.0.113.0/24
+  private-address: 255.255.255.255/32
+  private-address: fd00::/8
+  private-address: fe80::/10
+  qname-minimisation: yes
+  rrset-cache-size: 256m
+  rrset-cache-slabs: 8
+  rrset-roundrobin: yes
+  serve-expired-ttl: 3600
+  serve-expired: yes
+  so-rcvbuf: 1m
+  target-fetch-policy: "3 2 1 1 1"
+  unwanted-reply-threshold: 10000000
+  use-caps-for-id: no
+  verbosity: 0
+EOF
+  fi
+
+  msg_info "Installing Unbound"
+  $STD apt install -y unbound
+  echo "edns-packet-max=1232" >/etc/dnsmasq.d/99-edns.conf
+  echo -e "server=127.0.0.1#5335\nserver=8.8.8.8\nserver=8.8.4.4" >/etc/dnsmasq.d/01-pihole.conf
+  sed -i -E -e '/^\s*upstreams =/ s|=.*|= ["127.0.0.1#5335", "8.8.8.8", "8.8.4.4"]|' /etc/pihole/pihole.toml
   systemctl restart pihole-FTL.service
   msg_ok "Installed Unbound"
+fi
+
+if whiptail \
+  --title "Customize Pi-hole" \
+  --yesno "Would you like to sync this Pi-hole's configuration with another Pi-hole instance using nebula-sync? (https://github.com/lovelaze/nebula-sync)" \
+  --defaultno \
+  8 60; then
+  address=$(whiptail --title "Setup nebula-sync" --inputbox "Pi-hole address:" 8 60 3>&1 1>&2 2>&3)
+  password=$(whiptail --title "Setup nebula-sync" --inputbox "Pi-hole password:" 8 60 3>&1 1>&2 2>&3)
+  msg_info "Installing nebula-sync"
+  curl -Lfs "$(
+    curl -s https://api.github.com/repos/lovelaze/nebula-sync/releases/latest |
+      grep 'browser_download_url.*linux_amd64.tar.gz' | cut -d '"' -f 4
+  )" | tar -xzC /usr/bin/
+  chmod +x /usr/bin/nebula-sync
+  cat <<EOF >/etc/nebula-sync.conf
+PRIMARY=http://$address|$password
+REPLICAS=http://127.0.0.1|
+
+CRON=* * * * *
+FULL_SYNC=true
+RUN_GRAVITY=true
+EOF
+  cat <<EOF >/etc/systemd/system/nebula-sync.service
+[Unit]
+Description=Nebula Sync Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/nebula-sync run --env-file /etc/nebula-sync.conf
+Restart=on-failure
+RestartSec=1min
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl enable -q --now nebula-sync.service
+  msg_ok "Installed nebula-sync"
 fi
 
 motd_ssh

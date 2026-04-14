@@ -20,21 +20,26 @@ color
 catch_errors
 
 function update_script() {
-    header_info
-    check_container_storage
-    check_container_resources
-    if [[ ! -d /etc/pihole ]]; then
-        msg_error "No ${APP} Installation Found!"
-        exit
-    fi
-    msg_info "Updating PiHole"
-    set +e
-    $STD apt update
-    $STD apt upgrade -y
-    /usr/local/bin/pihole -up
-    msg_ok "Updated PiHole"
-    msg_ok "Updated successfully!"
+  header_info
+  check_container_storage
+  check_container_resources
+  if [[ ! -d /etc/pihole ]]; then
+    msg_error "No ${APP} Installation Found!"
     exit
+  fi
+  msg_info "Updating ${APP} LXC"
+  $STD apt update
+  $STD apt upgrade -y
+  /usr/local/bin/pihole -up
+  if command -v nebula-sync >/dev/null; then
+    curl -Lfs "$(
+      curl -s https://api.github.com/repos/lovelaze/nebula-sync/releases/latest |
+        grep 'browser_download_url.*linux_amd64.tar.gz' | cut -d '"' -f 4
+    )" | tar -xzC /usr/bin/
+    chmod +x /usr/bin/nebula-sync
+  fi
+  msg_ok "Updated successfully!"
+  exit
 }
 
 start
